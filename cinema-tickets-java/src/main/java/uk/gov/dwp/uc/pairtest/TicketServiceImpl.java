@@ -6,78 +6,50 @@ import thirdparty.seatbooking.SeatReservationService;
 import thirdparty.seatbooking.SeatReservationServiceImpl;
 import uk.gov.dwp.uc.pairtest.domain.TicketTypeRequest;
 import uk.gov.dwp.uc.pairtest.exception.InvalidPurchaseException;
+import uk.gov.dwp.uc.pairtest.pricing.DefaultTicketPricingStrategy;
+import uk.gov.dwp.uc.pairtest.pricing.TicketPricingStrategy;
+import uk.gov.dwp.uc.pairtest.validation.DefaultTicketValidator;
+import uk.gov.dwp.uc.pairtest.validation.TicketValidator;
 
 public class TicketServiceImpl implements TicketService {
     private final TicketPaymentService paymentService;
     private final SeatReservationService seatReservationService;
+    private final TicketValidator ticketValidator;
+    private final TicketPricingStrategy pricingStrategy;
 
     /**
-     * Default constructor that instantiates the external services.
+     * Default constructor that instantiates the external services and default implementations.
      */
     public TicketServiceImpl() {
-        this(new TicketPaymentServiceImpl(), new SeatReservationServiceImpl());
+        this(new TicketPaymentServiceImpl(),
+                new SeatReservationServiceImpl(),
+                new DefaultTicketValidator(),
+                new DefaultTicketPricingStrategy());
     }
 
     /**
-     * Constructor for dependency injection (useful for testing).
+     * Constructor for dependency injection (useful for testing and flexibility).
      */
-    public TicketServiceImpl(TicketPaymentService paymentService, SeatReservationService seatReservationService) {
+    public TicketServiceImpl(TicketPaymentService paymentService,
+                             SeatReservationService seatReservationService,
+                             TicketValidator ticketValidator,
+                             TicketPricingStrategy pricingStrategy) {
         this.paymentService = paymentService;
         this.seatReservationService = seatReservationService;
+        this.ticketValidator = ticketValidator;
+        this.pricingStrategy = pricingStrategy;
     }
 
     @Override
     public void purchaseTickets(Long accountId, TicketTypeRequest... ticketTypeRequests) throws InvalidPurchaseException {
-        // Validate accountId
-        if (accountId == null || accountId <= 0) {
-            throw new InvalidPurchaseException("Invalid account id");
-        }
-        if (ticketTypeRequests == null || ticketTypeRequests.length == 0) {
-            throw new InvalidPurchaseException("No ticket requests provided");
-        }
+        // Validate the ticket request
+        ticketValidator.validate(accountId, ticketTypeRequests);
 
-        int adultTickets = 0;
-        int childTickets = 0;
-        int infantTickets = 0;
-        int totalTickets = 0;
+        // Calculate payment and seat allocation using strategy
+        int totalAmountToPay = pricingStrategy.calculateTotalAmount(ticketTypeRequests);
+        int totalSeatsToAllocate = pricingStrategy.calculateTotalSeats(ticketTypeRequests);
 
-        // Process each ticket request
-        for (TicketTypeRequest request : ticketTypeRequests) {
-            if (request.getNoOfTickets() <= 0) {
-                throw new InvalidPurchaseException("Number of tickets must be positive");
-            }
-            switch (request.getTicketType()) {
-                case ADULT:
-                    adultTickets += request.getNoOfTickets();
-                    break;
-                case CHILD:
-                    childTickets += request.getNoOfTickets();
-                    break;
-                case INFANT:
-                    infantTickets += request.getNoOfTickets();
-                    break;
-                default:
-                    throw new InvalidPurchaseException("Unknown ticket type");
-            }
-            totalTickets += request.getNoOfTickets();
-        }
-
-        // Validate maximum ticket purchase limit (25 tickets)
-        if (totalTickets > 25) {
-            throw new InvalidPurchaseException("Cannot purchase more than 25 tickets at a time");
-        }
-
-        // Validate that any child or infant tickets require an adult ticket
-        if (adultTickets == 0 && (childTickets > 0 || infantTickets > 0)) {
-            throw new InvalidPurchaseException("Child and Infant tickets cannot be purchased without an Adult ticket");
-        }
-
-        // Calculate total cost (Infants are free)
-        int totalAmountToPay = (adultTickets * 25) + (childTickets * 15);
-        // Calculate seats to reserve (only Adult and Child tickets get seats)
-        int totalSeatsToAllocate = adultTickets + childTickets;
-
-        // Process payment and seat reservation
+        // Process payment and reserve seats
         paymentService.makePayment(accountId, totalAmountToPay);
         seatReservationService.reserveSeat(accountId, totalSeatsToAllocate);
     }
