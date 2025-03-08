@@ -7,6 +7,10 @@ import org.junit.Test;
 import uk.gov.dwp.uc.pairtest.domain.TicketTypeRequest;
 import uk.gov.dwp.uc.pairtest.domain.TicketTypeRequest.Type;
 import uk.gov.dwp.uc.pairtest.exception.InvalidPurchaseException;
+import uk.gov.dwp.uc.pairtest.pricing.DefaultTicketPricingStrategy;
+import uk.gov.dwp.uc.pairtest.pricing.TicketPricingStrategy;
+import uk.gov.dwp.uc.pairtest.validation.DefaultTicketValidator;
+import uk.gov.dwp.uc.pairtest.validation.TicketValidator;
 import thirdparty.paymentgateway.TicketPaymentService;
 import thirdparty.seatbooking.SeatReservationService;
 
@@ -20,7 +24,9 @@ public class TicketServiceImplTest {
     public void setUp() {
         paymentService = mock(TicketPaymentService.class);
         seatReservationService = mock(SeatReservationService.class);
-        ticketService = new TicketServiceImpl(paymentService, seatReservationService);
+        TicketValidator ticketValidator = new DefaultTicketValidator();
+        TicketPricingStrategy pricingStrategy = new DefaultTicketPricingStrategy();
+        ticketService = new TicketServiceImpl(paymentService, seatReservationService, ticketValidator, pricingStrategy);
     }
 
     @Test
