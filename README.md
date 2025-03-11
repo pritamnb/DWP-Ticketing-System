@@ -142,7 +142,13 @@ HTTP Status : 400 Bad Request
 }
 ```
 
----
+
+### Testing the Cinema Ticket Service
+This project includes unit tests to validate the business logic, ensuring that ticket purchases follow the given constraints and rules.
+
+![Ticket Booking Flow](testcases.png)
+
+
 
 ## Services and Business Logic
 
